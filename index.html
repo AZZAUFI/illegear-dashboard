@@ -11,7 +11,6 @@
             --bg-sidebar: #111114;
             --bg-card: #18181b;
             --accent-purple: #7c4dff;
-            --text-muted: #71717a;
         }
         body { background-color: var(--bg-main); color: #e4e4e7; font-family: 'Inter', sans-serif; }
         .sidebar { background-color: var(--bg-sidebar); border-right: 1px solid #27272a; }
@@ -19,7 +18,7 @@
         .sidebar-item:hover, .sidebar-item.active { background-color: #2e2e35; color: white; border-radius: 6px; }
         .sidebar-item.active { background-color: #3b3363; color: #d8b4fe; }
         .status-ring { height: 16px; width: 16px; border-radius: 50%; border: 3px solid currentColor; background: transparent; }
-        .note-preview { max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #71717a; font-size: 11px; }
+        .note-preview { font-size: 11px; color: #71717a; margin-top: 2px; line-height: 1.2; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -34,62 +33,67 @@
             <p class="text-[10px] font-bold text-zinc-500 uppercase px-2 mb-2 tracking-widest">Queue</p>
             <a href="#" class="sidebar-item active flex justify-between items-center px-3 py-2 text-sm">
                 <span class="flex items-center gap-3">🌀 All tickets</span>
-                <span class="text-xs opacity-50" id="countAll">0</span>
+                <span class="text-xs opacity-50" id="sideAll">0</span>
             </a>
             <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
                 <span class="flex items-center gap-3">🟡 In progress</span>
-                <span class="text-xs opacity-50" id="countProgress">0</span>
+                <span class="text-xs opacity-50" id="sideProgress">0</span>
             </a>
             <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
                 <span class="flex items-center gap-3 text-red-500">⚠ Overdue</span>
-                <span class="text-xs opacity-50" id="countOverdue">0</span>
+                <span class="text-xs opacity-50" id="sideOverdue">0</span>
             </a>
         </nav>
         
         <div class="mt-auto pt-4 border-t border-zinc-800">
-            <input type="password" id="tokenInput" placeholder="RepairShopr API Key" class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs focus:outline-none mb-2">
-            <button onclick="saveToken()" class="w-full bg-indigo-600 py-2 rounded text-xs font-bold uppercase tracking-tighter hover:bg-indigo-500">Sync Now</button>
+            <input type="password" id="tokenInput" placeholder="API Key" class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs focus:outline-none mb-2 text-zinc-300">
+            <button onclick="saveToken()" class="w-full bg-indigo-600 py-2 rounded text-xs font-bold uppercase tracking-tighter hover:bg-indigo-500 transition">Sync</button>
         </div>
     </aside>
 
     <main class="flex-grow overflow-y-auto p-8">
         <div class="flex justify-between items-center mb-8">
-            <h2 class="text-2xl font-semibold">Live Ticket Stream</h2>
-            <div class="flex gap-2">
-                <input type="text" id="searchInput" onkeyup="filterTickets()" placeholder="Search customer..." class="bg-zinc-900 border border-zinc-800 rounded px-4 py-2 text-sm w-64 focus:border-indigo-500 outline-none">
-            </div>
+            <h2 class="text-2xl font-semibold">Support Dashboard</h2>
+            <div class="flex gap-2 text-xs text-zinc-500" id="syncTime">Not Synced</div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
             <div class="metric-card p-6">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Total Active</p>
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Total Open</p>
                 <div class="flex items-center gap-4">
                     <div class="status-ring text-white"></div>
-                    <div class="text-2xl font-bold" id="statTotal">0</div>
+                    <div class="text-2xl font-bold" id="statOpen">0</div>
                 </div>
             </div>
             <div class="metric-card p-6">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Repairing</p>
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">In Progress</p>
                 <div class="flex items-center gap-4">
                     <div class="status-ring text-orange-500"></div>
-                    <div class="text-2xl font-bold" id="statRepair">0</div>
+                    <div class="text-2xl font-bold" id="statProgress">0</div>
                 </div>
             </div>
             <div class="metric-card p-6">
                 <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Note Alerts</p>
-                <div class="flex items-center gap-4 text-indigo-400">
-                    <div class="status-ring"></div>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-indigo-500"></div>
                     <div class="text-2xl font-bold" id="statNotes">0</div>
+                </div>
+            </div>
+            <div class="metric-card p-6 text-red-500">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Overdue</p>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-red-500"></div>
+                    <div class="text-2xl font-bold" id="statOverdue">0</div>
                 </div>
             </div>
         </div>
 
-        <div class="relative">
+        <div class="relative overflow-x-auto">
             <table class="w-full text-left text-sm border-t border-zinc-800">
                 <thead class="text-[10px] font-bold uppercase text-zinc-500">
                     <tr>
                         <th class="py-4 px-2">#</th>
-                        <th class="py-4 px-2">Ticket Info & Internal Note</th>
+                        <th class="py-4 px-2">Subject / Internal Note</th>
                         <th class="py-4 px-2">Customer</th>
                         <th class="py-4 px-2">Status</th>
                     </tr>
@@ -97,7 +101,7 @@
                 <tbody id="ticketListBody" class="text-zinc-400"></tbody>
             </table>
             <div id="emptyState" class="text-center py-20 text-zinc-600 text-sm italic">
-                Enter your API Key in the sidebar to begin.
+                Ready to sync. Enter your RepairShopr API key.
             </div>
         </div>
     </main>
@@ -113,20 +117,24 @@
             const token = localStorage.getItem('api_token');
             if(!token) return;
 
-            const subdomain = 'illegear'; // <--- Change this to your actual subdomain
-            const proxy = 'https://cors-anywhere.herokuapp.com/'; 
-            const url = `${proxy}https://${subdomain}.repairshopr.com/api/v1/tickets?api_key=${token}`;
+            // CONFIGURATION
+            const subdomain = 'illegear'; // <--- Check this!
+            const url = `https://${subdomain}.repairshopr.com/api/v1/tickets?api_key=${token}`;
 
-            document.getElementById('emptyState').innerText = "Connecting to RepairShopr...";
+            document.getElementById('emptyState').innerText = "Establishing secure connection...";
 
             try {
                 const res = await fetch(url);
-                if (!res.ok) throw new Error("Key invalid or Proxy needed");
+                if (!res.ok) throw new Error("Sync Failed. Check API key permissions.");
                 const data = await res.json();
                 renderUI(data.tickets);
+                document.getElementById('syncTime').innerText = "Last Sync: " + new Date().toLocaleTimeString();
             } catch (e) {
                 document.getElementById('emptyState').innerHTML = `
-                    <div class="text-red-500">Sync Error. Please visit <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" class="underline">this link</a> to enable the temporary proxy.</div>
+                    <div class="text-red-500">
+                        <p class="font-bold">Sync Error</p>
+                        <p class="text-[10px]">${e.message}</p>
+                    </div>
                 `;
             }
         }
@@ -137,37 +145,44 @@
             
             if (!tickets || tickets.length === 0) {
                 document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('emptyState').innerText = "No tickets found.";
                 return;
             }
 
             document.getElementById('emptyState').classList.add('hidden');
             
-            // Update Stats
-            document.getElementById('statTotal').innerText = tickets.length;
-            document.getElementById('countAll').innerText = tickets.length;
+            // Stats Logic
+            let inProgressCount = 0;
+            document.getElementById('statOpen').innerText = tickets.length;
+            document.getElementById('sideAll').innerText = tickets.length;
 
             tickets.forEach(t => {
-                // Read the note inside the ticket
-                const note = t.comments && t.comments.length > 0 ? t.comments[0].body : "No internal notes yet.";
+                if(t.status === 'In Progress') inProgressCount++;
                 
+                // Read the note (often found in comments or custom fields)
+                const note = t.subject_line || "No specific note inside.";
+
                 const row = `
-                    <tr class="border-b border-zinc-900 hover:bg-zinc-800/30">
+                    <tr class="border-b border-zinc-900 hover:bg-zinc-800/40 transition-colors">
                         <td class="py-4 px-2 font-mono text-xs text-indigo-400">#${t.number}</td>
                         <td class="py-4 px-2">
                             <div class="font-semibold text-white">${t.subject}</div>
                             <div class="note-preview">${note}</div>
                         </td>
-                        <td class="py-4 px-2 text-zinc-300 text-xs">${t.customer_business_then_name}</td>
+                        <td class="py-4 px-2 text-zinc-300 text-xs">${t.customer_business_then_name || t.customer_name}</td>
                         <td class="py-4 px-2">
-                            <span class="px-2 py-1 rounded-full bg-zinc-800 text-[10px] border border-zinc-700">${t.status}</span>
+                            <span class="px-2 py-0.5 rounded bg-zinc-800 text-[10px] border border-zinc-700">${t.status}</span>
                         </td>
                     </tr>
                 `;
                 body.innerHTML += row;
             });
+
+            document.getElementById('statProgress').innerText = inProgressCount;
+            document.getElementById('sideProgress').innerText = inProgressCount;
         }
 
-        // Auto-run if token exists
+        // Auto-run
         if(localStorage.getItem('api_token')) {
             document.getElementById('tokenInput').value = localStorage.getItem('api_token');
             fetchData();
