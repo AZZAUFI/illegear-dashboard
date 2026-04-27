@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ILLEGEAR | Ticket Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-main: #0a0a0c;
+            --bg-sidebar: #111114;
+            --bg-card: #18181b;
+            --accent-purple: #7c4dff;
+            --text-muted: #71717a;
+        }
+        body { background-color: var(--bg-main); color: #e4e4e7; font-family: 'Inter', sans-serif; }
+        .sidebar { background-color: var(--bg-sidebar); border-right: 1px solid #27272a; }
+        .metric-card { background-color: var(--bg-card); border: 1px solid #27272a; border-radius: 8px; }
+        .sidebar-item:hover, .sidebar-item.active { background-color: #2e2e35; color: white; border-radius: 6px; }
+        .sidebar-item.active { background-color: #3b3363; color: #d8b4fe; }
+        .status-ring { height: 16px; width: 16px; border-radius: 50%; border: 3px solid currentColor; background: transparent; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <aside class="sidebar w-64 flex-shrink-0 flex flex-col p-4">
+        <div class="flex items-center gap-2 mb-10 px-2">
+            <div class="bg-indigo-600 p-1 rounded text-white font-bold text-xl">+</div>
+            <span class="font-bold tracking-widest text-lg">ILLEGEAR</span>
+        </div>
+
+        <nav class="flex-grow space-y-1">
+            <p class="text-[10px] font-bold text-zinc-500 uppercase px-2 mb-2 tracking-widest">Queue</p>
+            <a href="#" class="sidebar-item active flex justify-between items-center px-3 py-2 text-sm">
+                <span class="flex items-center gap-3">🌀 All tickets</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+            <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
+                <span class="flex items-center gap-3">⚪ New</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+            <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
+                <span class="flex items-center gap-3">🟡 In progress</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+            <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
+                <span class="flex items-center gap-3">↕ Waiting</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+            <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
+                <span class="flex items-center gap-3">🟢 Ready pickup</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+
+            <p class="text-[10px] font-bold text-zinc-500 uppercase px-2 mt-8 mb-2 tracking-widest">Flags</p>
+            <a href="#" class="sidebar-item flex justify-between items-center px-3 py-2 text-sm text-zinc-400">
+                <span class="flex items-center gap-3 text-red-500">⚠ Overdue >7d</span>
+                <span class="text-xs opacity-50">0</span>
+            </a>
+        </nav>
+        
+        <div class="mt-auto pt-4 border-t border-zinc-800">
+            <input type="password" id="tokenInput" placeholder="API Key" class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs focus:outline-none mb-2">
+            <button onclick="saveToken()" class="w-full bg-indigo-600 py-2 rounded text-xs font-bold uppercase tracking-tighter">Sync</button>
+        </div>
+    </aside>
+
+    <main class="flex-grow overflow-y-auto p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-2xl font-semibold">All Tickets</h2>
+            <div class="flex gap-2">
+                <input type="text" placeholder="Search name, #ticket..." class="bg-zinc-900 border border-zinc-800 rounded px-4 py-2 text-sm w-64 focus:border-indigo-500 outline-none">
+                <button onclick="fetchData()" class="bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded text-sm flex items-center gap-2">⟳ Refresh</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+            <div class="metric-card p-6">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Total Open</p>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-white"></div>
+                    <div>
+                        <div class="text-2xl font-bold" id="statOpen">0</div>
+                        <p class="text-xs text-zinc-500">active tickets</p>
+                    </div>
+                </div>
+            </div>
+            <div class="metric-card p-6">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">In Progress</p>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-orange-500"></div>
+                    <div>
+                        <div class="text-2xl font-bold" id="statProgress">0</div>
+                        <p class="text-xs text-zinc-500">being repaired</p>
+                    </div>
+                </div>
+            </div>
+            <div class="metric-card p-6">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Ready Pickup</p>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-green-500"></div>
+                    <div>
+                        <div class="text-2xl font-bold" id="statReady">0</div>
+                        <p class="text-xs text-zinc-500">awaiting collection</p>
+                    </div>
+                </div>
+            </div>
+            <div class="metric-card p-6">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Overdue</p>
+                <div class="flex items-center gap-4">
+                    <div class="status-ring text-red-500"></div>
+                    <div>
+                        <div class="text-2xl font-bold" id="statOverdue">0</div>
+                        <p class="text-xs text-zinc-500">older than 7 days</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relative overflow-x-auto">
+            <div class="flex justify-between items-center mb-4 text-xs text-zinc-500 px-1">
+                <span>0 tickets</span>
+                <select class="bg-transparent border-none outline-none cursor-pointer">
+                    <option>Oldest first</option>
+                    <option>Newest first</option>
+                </select>
+            </div>
+            <table class="w-full text-left text-sm border-t border-zinc-800">
+                <thead class="text-[10px] font-bold uppercase text-zinc-500">
+                    <tr>
+                        <th class="py-4 px-2">#</th>
+                        <th class="py-4 px-2">Subject</th>
+                        <th class="py-4 px-2">Customer</th>
+                        <th class="py-4 px-2">Age</th>
+                        <th class="py-4 px-2">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="ticketListBody" class="text-zinc-400">
+                    </tbody>
+            </table>
+            <div id="emptyState" class="text-center py-20 text-zinc-600 text-sm">
+                No tickets match this filter.
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function saveToken() {
+            const token = document.getElementById('tokenInput').value;
+            localStorage.setItem('api_token', token);
+            fetchData();
+        }
+
+        async function fetchData() {
+            const token = localStorage.getItem('api_token');
+            if(!token) return;
+
+            // This is where you connect to the actual ILLEGEAR or Support API
+            try {
+                const res = await fetch('YOUR_API_ENDPOINT', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                renderUI(data);
+            } catch (e) {
+                console.log("No live data yet. Update the URL in fetchData()");
+            }
+        }
+
+        function renderUI(data) {
+            // Logic to update stats and table rows
+            document.getElementById('emptyState').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
