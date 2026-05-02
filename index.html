@@ -1,131 +1,138 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ILLEGEAR | Ticket Management</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>ILLEGEAR Support Dashboard</title>
     <style>
         :root {
-            --bg-main: #0a0a0c;
-            --bg-sidebar: #111114;
-            --bg-card: #18181b;
+            --illegear-blue: #007bff;
+            --dark-bg: #1a1a1a;
+            --card-bg: #ffffff;
+            --text-main: #333;
         }
-        body { background-color: var(--bg-main); color: #e4e4e7; font-family: 'Inter', sans-serif; }
-        .sidebar { background-color: var(--bg-sidebar); border-right: 1px solid #27272a; }
-        .metric-card { background-color: var(--bg-card); border: 1px solid #27272a; border-radius: 8px; }
-        .sidebar-item:hover, .sidebar-item.active { background-color: #2e2e35; color: white; border-radius: 6px; }
-        .sidebar-item.active { background-color: #3b3363; color: #d8b4fe; }
-        .status-ring { height: 16px; width: 16px; border-radius: 50%; border: 3px solid currentColor; background: transparent; }
-        .note-preview { font-size: 11px; color: #71717a; margin-top: 4px; }
+        body { 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f0f2f5; 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--dark-bg);
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); 
+            gap: 20px; 
+        }
+        .card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+        }
+        .card h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .stat-big { font-size: 2.5rem; font-weight: bold; color: var(--illegear-blue); margin: 10px 0; }
+        .ticket-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f9f9f9;
+            font-size: 0.9rem;
+        }
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #eee;
+        }
+        #loading-overlay { text-align: center; padding: 50px; font-weight: bold; }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden">
+<body>
 
-    <aside class="sidebar w-64 flex-shrink-0 flex flex-col p-4">
-        <div class="flex items-center gap-2 mb-10 px-2">
-            <div class="bg-indigo-600 p-1 rounded text-white font-bold text-xl">+</div>
-            <span class="font-bold tracking-widest text-lg">ILLEGEAR</span>
-        </div>
-        <nav class="flex-grow space-y-1">
-            <p class="text-[10px] font-bold text-zinc-500 uppercase px-2 mb-2 tracking-widest">Queue</p>
-            <a href="#" class="sidebar-item active flex justify-between items-center px-3 py-2 text-sm">
-                <span class="flex items-center gap-3">🌀 All tickets</span>
-                <span id="sideCount" class="text-xs opacity-50">0</span>
-            </a>
-        </nav>
-        <div class="mt-auto pt-4 border-t border-zinc-800">
-            <input type="password" id="tokenInput" placeholder="RepairShopr API Key" class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs focus:outline-none mb-2">
-            <button onclick="saveToken()" class="w-full bg-indigo-600 py-2 rounded text-xs font-bold uppercase tracking-tighter">Sync Now</button>
-        </div>
-    </aside>
+    <div class="header">
+        <h1>Support Overview</h1>
+        <div id="last-updated">Refreshing...</div>
+    </div>
 
-    <main class="flex-grow p-8 overflow-y-auto">
-        <h2 class="text-2xl font-semibold mb-8">Ticket Stream</h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-            <div class="metric-card p-6">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase mb-4 tracking-wider">Total Active</p>
-                <div class="text-2xl font-bold" id="statTotal">0</div>
-            </div>
-            <div id="proxyAlert" class="md:col-span-2 metric-card p-6 border-amber-900/50 bg-amber-900/10 hidden">
-                <p class="text-[10px] font-bold text-amber-500 uppercase mb-2">System Notice</p>
-                <p class="text-xs text-amber-200/70">CORS Access Required. <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" class="underline font-bold text-amber-500">Click here and Request Access</a> to enable sync.</p>
+    <div id="loading-overlay">Connecting to RepairShopr...</div>
+
+    <div class="grid" id="main-content" style="display: none;">
+        <!-- Total Tickets Card -->
+        <div class="card">
+            <h2>Active Tickets</h2>
+            <div id="ticket-count" class="stat-big">0</div>
+            <p>Recent repair requests in queue.</p>
+        </div>
+
+        <!-- Recent Activity Card -->
+        <div class="card">
+            <h2>Recent Updates</h2>
+            <div id="ticket-list">
+                <!-- Data injected here -->
             </div>
         </div>
-
-        <table class="w-full text-left text-sm border-t border-zinc-800">
-            <thead class="text-[10px] font-bold uppercase text-zinc-500">
-                <tr>
-                    <th class="py-4 px-2">#</th>
-                    <th class="py-4 px-2">Subject & Last Comment</th>
-                    <th class="py-4 px-2">Customer</th>
-                    <th class="py-4 px-2">Status</th>
-                </tr>
-            </thead>
-            <tbody id="ticketListBody" class="text-zinc-400"></tbody>
-        </table>
-        <div id="emptyState" class="text-center py-20 text-zinc-600 text-sm">Dashboard is idle.</div>
-    </main>
+    </div>
 
     <script>
-        function saveToken() {
-            const token = document.getElementById('tokenInput').value;
-            localStorage.setItem('api_token', token);
-            fetchData();
-        }
+        const CONFIG = {
+            apiKey: 'T6d9c84acd6b1bf2d4-138a57ae68df0b79ab964e01ad2147ba',
+            subdomain: 'illegearticket',
+            baseUrl: 'https://illegearticket.repairshopr.com/api/v1'
+        };
 
-        async function fetchData() {
-            const token = localStorage.getItem('api_token');
-            if(!token) return;
-
-            // 1. CHANGE 'illegear' to your exact subdomain if different
-            const subdomain = 'illegear'; 
-            const proxy = 'https://cors-anywhere.herokuapp.com/';
-            const url = `${proxy}https://${subdomain}.repairshopr.com/api/v1/tickets?api_key=${token}`;
-
-            document.getElementById('emptyState').innerText = "🔄 Connecting...";
-
+        async function fetchDashboardData() {
             try {
-                const res = await fetch(url);
-                if (res.status === 403) {
-                    document.getElementById('proxyAlert').classList.remove('hidden');
-                    throw new Error("Proxy Access Denied");
-                }
-                const data = await res.json();
-                renderUI(data.tickets);
-            } catch (e) {
-                document.getElementById('emptyState').innerText = "Sync Failed: " + e.message;
+                // Fetch Tickets
+                const response = await fetch(`${CONFIG.baseUrl}/tickets?api_key=${CONFIG.apiKey}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                updateUI(data.tickets);
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                document.getElementById('loading-overlay').innerHTML = 
+                    `<p style="color:red;">Error: Could not connect to API. Check CORS settings or API key.</p>`;
             }
         }
 
-        function renderUI(tickets) {
-            const body = document.getElementById('ticketListBody');
-            body.innerHTML = '';
-            document.getElementById('emptyState').classList.add('hidden');
-            document.getElementById('statTotal').innerText = tickets.length;
-            document.getElementById('sideCount').innerText = tickets.length;
+        function updateUI(tickets) {
+            // Hide loading, show content
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('main-content').style.display = 'grid';
 
-            tickets.forEach(t => {
-                const row = `
-                    <tr class="border-b border-zinc-900">
-                        <td class="py-4 px-2 font-mono text-xs">#${t.number}</td>
-                        <td class="py-4 px-2">
-                            <div class="font-semibold text-white">${t.subject}</div>
-                            <div class="note-preview">${t.last_comment_body || "No internal notes."}</div>
-                        </td>
-                        <td class="py-4 px-2 text-xs">${t.customer_business_then_name}</td>
-                        <td class="py-4 px-2"><span class="px-2 py-1 rounded bg-zinc-800 text-[10px]">${t.status}</span></td>
-                    </tr>
-                `;
-                body.innerHTML += row;
-            });
+            // Update Count
+            document.getElementById('ticket-count').innerText = tickets.length;
+
+            // Update List
+            const listContainer = document.getElementById('ticket-list');
+            listContainer.innerHTML = tickets.slice(0, 8).map(ticket => `
+                <div class="ticket-row">
+                    <div>
+                        <strong>#${ticket.number}</strong><br>
+                        <small>${ticket.subject || 'No Subject'}</small>
+                    </div>
+                    <span class="status-pill">${ticket.status}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('last-updated').innerText = `Last update: ${new Date().toLocaleTimeString()}`;
         }
 
-        if(localStorage.getItem('api_token')) {
-            document.getElementById('tokenInput').value = localStorage.getItem('api_token');
-            fetchData();
-        }
+        // Initialize and refresh every 5 minutes
+        fetchDashboardData();
+        setInterval(fetchDashboardData, 300000);
     </script>
 </body>
 </html>
