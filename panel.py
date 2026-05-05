@@ -8,63 +8,58 @@ API_KEY = "T6d9c84acd6b1bf2d4-138a57ae68df0b79ab964e01ad2147ba"
 SUBDOMAIN = "illegearticket" 
 BASE_URL = f"https://{SUBDOMAIN}.repairshopr.com/api/v1"
 
+# Force wide mode and hide sidebar for maximum screen real estate
 st.set_page_config(page_title="Illegear Command Center", layout="wide", initial_sidebar_state="collapsed")
 
-# --- MODERN HOSPITAL UI STYLING ---
+# --- GRID & HOSPITAL UI STYLING ---
 st.markdown("""
     <style>
-    /* Main background */
-    .stApp {
-        background-color: #0e1117;
-    }
-    
-    /* Header styling */
+    /* Global Styles */
+    .stApp { background-color: #05070a; color: #e0e0e0; }
+    header {visibility: hidden;}
     .main-header {
-        font-family: 'Courier New', Courier, monospace;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         color: #00ffcc;
         text-align: center;
-        text-transform: uppercase;
-        letter-spacing: 2px;
+        font-size: 1.8rem;
+        font-weight: 800;
+        letter-spacing: 3px;
+        margin-bottom: 5px;
         padding: 10px;
-        border-bottom: 2px solid #00ffcc;
-        margin-bottom: 20px;
+        background: rgba(0, 255, 204, 0.05);
+        border-bottom: 1px solid #00ffcc;
     }
 
-    /* Panel Card Styling */
-    .status-card {
-        background-color: #1a1c24;
-        border-radius: 10px;
-        padding: 20px;
-        border-left: 5px solid #00ffcc;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 15px rgba(0, 255, 204, 0.1);
-    }
-
-    .critical-card {
-        background-color: #241a1a;
-        border-radius: 10px;
-        padding: 20px;
-        border-left: 5px solid #ff4b4b;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.1);
+    /* Fixed Height Scrollable Containers */
+    .grid-container {
+        height: 75vh;
+        overflow-y: auto;
+        padding-right: 10px;
     }
     
-    /* Heartbeat animation */
-    .heartbeat {
-        color: #ff4b4b;
-        animation: beat .25s infinite alternate;
-        display: inline-block;
-    }
-    @keyframes beat{
-        to { transform: scale(1.2); }
-    }
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0e1117; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
 
-    /* Metric numbers */
-    .metric-val {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #ffffff;
+    /* Panel Card Styling */
+    .panel-card {
+        background: #11141a;
+        border-radius: 4px;
+        padding: 12px;
+        margin-bottom: 8px;
+        border-left: 4px solid #444;
     }
+    .unread-border { border-left-color: #00d4ff; box-shadow: inset 5px 0 10px -5px #00d4ff; }
+    .overdue-border { border-left-color: #ff3e3e; box-shadow: inset 5px 0 10px -5px #ff3e3e; }
+    .neardue-border { border-left-color: #ffaa00; box-shadow: inset 5px 0 10px -5px #ffaa00; }
+
+    .card-id { font-size: 0.7rem; color: #888; font-weight: bold; }
+    .card-title { font-size: 1rem; font-weight: 700; color: #fff; margin: 2px 0; }
+    .card-meta { font-size: 0.8rem; color: #bbb; }
+    
+    /* Metric styling */
+    div[data-testid="stMetricValue"] { font-size: 2rem !important; color: #00ffcc !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -72,91 +67,87 @@ def fetch_tickets():
     headers = {'Authorization': f'Bearer {API_KEY}'}
     try:
         response = requests.get(f"{BASE_URL}/tickets", headers=headers, timeout=10)
-        if response.status_code == 200:
-            return response.json().get('tickets', [])
-        return []
+        return response.json().get('tickets', []) if response.status_code == 200 else []
     except:
         return []
 
 def main():
-    # --- TOP BAR ---
-    st.markdown('<h1 class="main-header">✚ ILLEGEAR TICKET COMMAND CENTER</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">ILLEGEAR COMMAND CENTER : MONITOR 01</div>', unsafe_allow_html=True)
     
-    col_t1, col_t2, col_t3 = st.columns([1, 1, 1])
-    with col_t2:
-        st.markdown(f"<div style='text-align:center; color:#888;'>SYSTEM LIVE | LAST SYNC: {datetime.now().strftime('%H:%M:%S')}</div>", unsafe_allow_html=True)
-    
+    # Auto-refresh helper (simulated by a small button)
+    cols = st.columns([6, 1])
+    with cols[1]:
+        if st.button('REFRESH'): st.rerun()
+
     tickets = fetch_tickets()
     df = pd.DataFrame(tickets)
 
-    # --- DATA PROCESSING ---
-    unread = pd.DataFrame()
-    overdue = pd.DataFrame()
-    near_due = pd.DataFrame()
+    unread = overdue = near_due = pd.DataFrame()
 
     if not df.empty:
         if 'has_unread_ticket_comments' in df.columns:
             unread = df[df['has_unread_ticket_comments'] == True]
-        
         if 'due_date' in df.columns:
             df['due_date'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
             now = datetime.now()
             overdue = df[df['due_date'] <= now].dropna(subset=['due_date'])
             near_due = df[(df['due_date'] > now) & (df['due_date'] <= now + pd.Timedelta(hours=24))]
 
-    # --- TOP METRICS ---
-    m1, m2, m3 = st.columns(3)
-    m1.metric("PENDING REPLIES", len(unread))
-    m2.metric("OVERDUE", len(overdue), delta_color="inverse")
-    m3.metric("DUE 24H", len(near_due))
+    # --- TOP ANALYTICS BAR ---
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("TOTAL QUEUE", len(df))
+    m2.metric("UNREAD REPLIES", len(unread))
+    m3.metric("CRITICAL OVERDUE", len(overdue))
+    m4.metric("DUE 24H", len(near_due))
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- MAIN DASHBOARD GRID ---
-    left_col, right_col = st.columns(2)
+    # --- TRIPLE GRID LAYOUT ---
+    col1, col2, col3 = st.columns(3)
 
-    with left_col:
-        st.markdown("### <span class='heartbeat'>♥</span> INCOMING REPLIES", unsafe_allow_html=True)
+    with col1:
+        st.markdown("### 📩 REPLIES")
+        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
         if not unread.empty:
             for _, row in unread.iterrows():
-                st.markdown(f"""
-                <div class="status-card">
-                    <div style="color:#00ffcc; font-size:0.8rem;">PATIENT/TICKET #{row.get('number')}</div>
-                    <div style="font-size:1.2rem; font-weight:bold; color:white;">{row.get('customer_business_then_name')}</div>
-                    <div style="color:#aaa;">{row.get('subject')[:50]}...</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div class="panel-card unread-border">
+                    <div class="card-id">TICKET #{row.get('number')}</div>
+                    <div class="card-title">{row.get('customer_business_then_name', 'N/A')}</div>
+                    <div class="card-meta">{row.get('subject', '')[:40]}...</div>
+                </div>""", unsafe_allow_html=True)
         else:
-            st.success("No active alerts.")
+            st.info("No unread replies.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with right_col:
-        st.markdown("### ⚠️ CRITICAL DEADLINES", unsafe_allow_html=True)
-        
-        # Show Overdue First
+    with col2:
+        st.markdown("### 🚨 OVERDUE")
+        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
         if not overdue.empty:
             for _, row in overdue.iterrows():
-                st.markdown(f"""
-                <div class="critical-card">
-                    <div style="color:#ff4b4b; font-size:0.8rem;">STATUS: OVERDUE</div>
-                    <div style="font-size:1.2rem; font-weight:bold; color:white;">Ticket #{row.get('number')}</div>
-                    <div style="color:#ff8888;">Expired: {row['due_date'].strftime('%H:%M | %d %b')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div class="panel-card overdue-border">
+                    <div class="card-id">TICKET #{row.get('number')}</div>
+                    <div class="card-title">🚨 OVERDUE</div>
+                    <div class="card-meta">Expired: {row['due_date'].strftime('%d %b %H:%M')}</div>
+                    <div class="card-meta">{row.get('customer_business_then_name', '')[:25]}</div>
+                </div>""", unsafe_allow_html=True)
+        else:
+            st.success("No overdue tickets.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # Show Near Due
+    with col3:
+        st.markdown("### ⏳ DUE SOON")
+        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
         if not near_due.empty:
             for _, row in near_due.iterrows():
-                st.markdown(f"""
-                <div class="status-card" style="border-left: 5px solid #f1c40f;">
-                    <div style="color:#f1c40f; font-size:0.8rem;">STATUS: NEAR EXPIRY</div>
-                    <div style="font-size:1.1rem; font-weight:bold; color:white;">Ticket #{row.get('number')}</div>
-                    <div style="color:#aaa;">Due in: {((row['due_date'] - datetime.now()).seconds // 3600)} Hours</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-    # --- AUTO-REFRESH BUTTON ---
-    if st.button('MANUAL SYSTEM RE-SCAN'):
-        st.rerun()
+                st.markdown(f"""<div class="panel-card neardue-border">
+                    <div class="card-id">TICKET #{row.get('number')}</div>
+                    <div class="card-title">WARNING</div>
+                    <div class="card-meta">Due: {row['due_date'].strftime('%H:%M Today')}</div>
+                    <div class="card-meta">{row.get('subject', '')[:35]}</div>
+                </div>""", unsafe_allow_html=True)
+        else:
+            st.info("No upcoming deadlines.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
