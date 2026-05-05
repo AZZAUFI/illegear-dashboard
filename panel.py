@@ -16,7 +16,6 @@ st.markdown("""
     .stApp { background-color: #05070a; color: #e0e0e0; }
     header {visibility: hidden;}
     
-    /* Title Bar */
     .main-header {
         font-family: 'Courier New', monospace;
         color: #00ffcc;
@@ -29,7 +28,6 @@ st.markdown("""
         box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
     }
 
-    /* Auto-detecting Responsive Grid */
     .ticket-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -37,7 +35,6 @@ st.markdown("""
         padding: 10px;
     }
 
-    /* Individual Ticket Box */
     .ticket-box {
         background: #11141b;
         border: 1px solid #2d3139;
@@ -53,7 +50,6 @@ st.markdown("""
         transform: translateY(-3px);
     }
 
-    /* Status Indicators */
     .indicator {
         height: 5px;
         width: 100%;
@@ -72,7 +68,6 @@ st.markdown("""
     .ticket-subject { font-size: 0.85rem; color: #bbb; margin: 8px 0; min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .ticket-time { font-size: 0.8rem; font-weight: bold; line-height: 1.2; }
     
-    /* Metric styling */
     div[data-testid="stMetricValue"] { color: #00ffcc !important; font-family: monospace; }
     </style>
     """, unsafe_allow_html=True)
@@ -96,19 +91,16 @@ def main():
 
     df = pd.DataFrame(tickets)
     
-    # --- DATA SAFETY FIXES ---
-    # Fix for the KeyError: Ensuring these exist even if the API didn't return them
+    # Data Safety Fixes
     if 'has_unread_ticket_comments' not in df.columns:
         df['has_unread_ticket_comments'] = False
-    
     if 'due_date' not in df.columns:
         df['due_date'] = None
 
-    # Standardize time
     now = datetime.now()
     df['due_date_dt'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
 
-    # --- METRIC CALCULATION ---
+    # Metrics
     unread_count = len(df[df['has_unread_ticket_comments'] == True])
     overdue_count = len(df[df['due_date_dt'] <= now].dropna(subset=['due_date_dt']))
     
@@ -117,11 +109,10 @@ def main():
     m2.metric("UNREAD REPLIES", unread_count)
     m3.metric("CRITICAL OVERDUE", overdue_count)
 
-    # Building the Grid
-    grid_html = '<div class="ticket-grid">'
+    # BUILDING THE GRID CONTENT
+    grid_items_html = ""
     
     for _, row in df.iterrows():
-        # Determine Status logic
         status_class = "status-normal"
         status_text = "STABLE"
         time_display = ""
@@ -130,36 +121,39 @@ def main():
         is_overdue = pd.notnull(row['due_date_dt']) and row['due_date_dt'] <= now
         is_near = pd.notnull(row['due_date_dt']) and (now < row['due_date_dt'] <= now + pd.Timedelta(hours=24))
 
+        color = "#888"
         if is_overdue:
             status_class = "status-overdue"
             status_text = "CRITICAL: OVERDUE"
             time_display = row['due_date_dt'].strftime('%d %b %H:%M')
+            color = "#ff3e3e"
         elif is_unread:
             status_class = "status-unread"
             status_text = "NEW MESSAGE"
             time_display = "Action Required"
+            color = "#00d4ff"
         elif is_near:
             status_class = "status-warning"
             status_text = "URGENT: DUE SOON"
             time_display = row['due_date_dt'].strftime('%H:%M Today')
+            color = "#ffaa00"
         
-        # UI Box Generation
-        grid_html += f"""
+        # Accumulate the HTML for each box
+        grid_items_html += f"""
         <div class="ticket-box">
             <div class="indicator {status_class}"></div>
             <div class="ticket-no">REF: #{row.get('number', '???')}</div>
-            <div class="cust-name">{row.get('customer_business_then_name', 'UNKNOWN PATIENT')}</div>
+            <div class="cust-name">{row.get('customer_business_then_name', 'UNKNOWN')}</div>
             <div class="ticket-subject">{str(row.get('subject', 'No Subject'))[:60]}</div>
-            <div class="ticket-time" style="color: {'#ff3e3e' if is_overdue else '#00d4ff' if is_unread else '#ffaa00' if is_near else '#888'}">
+            <div class="ticket-time" style="color: {color}">
                 {status_text} <br> {time_display}
             </div>
         </div>
         """
     
-    grid_html += '</div>'
-    st.markdown(grid_html, unsafe_allow_html=True)
+    # RENDER THE WHOLE GRID AT ONCE
+    st.markdown(f'<div class="ticket-grid">{grid_items_html}</div>', unsafe_allow_html=True)
 
-    # Refresh functionality
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button('REFRESH SYSTEM SCAN'):
         st.rerun()
