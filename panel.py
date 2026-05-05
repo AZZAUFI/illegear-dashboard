@@ -4,53 +4,53 @@ import pandas as pd
 from datetime import datetime
 
 # --- CONFIGURATION ---
+# Based on your link: https://illegearticket.repairshopr.com
 API_KEY = "T6d9c84acd6b1bf2d4-138a57ae68df0b79ab964e01ad2147ba"
-SUBDOMAIN = "your_subdomain"  # Replace with your RepairShopr subdomain
+SUBDOMAIN = "illegearticket" 
 BASE_URL = f"https://{SUBDOMAIN}.repairshopr.com/api/v1"
 
-st.set_page_config(page_title="RepairShopr Monitor", layout="wide")
+st.set_page_config(page_title="Illegear Ticket Monitor", layout="wide")
 
 def fetch_tickets():
     headers = {'Authorization': f'Bearer {API_KEY}'}
     try:
-        response = requests.get(f"{BASE_URL}/tickets", headers=headers)
+        # We use a timeout to prevent the app from hanging if the API is slow
+        response = requests.get(f"{BASE_URL}/tickets", headers=headers, timeout=10)
         if response.status_code == 200:
             return response.json().get('tickets', [])
         else:
-            st.error(f"Failed to fetch data: {response.status_code}")
+            st.error(f"API Error {response.status_code}: Please check if your API Key is valid.")
             return []
     except Exception as e:
         st.error(f"Connection Error: {e}")
         return []
 
 def main():
-    st.title("🛠️ RepairShopr Critical Monitor")
+    st.title("🛠️ Illegear Critical Ticket Monitor")
     
-    if st.button('🔄 Refresh Data'):
+    # Sidebar for quick stats
+    st.sidebar.header("Dashboard Controls")
+    if st.sidebar.button('🔄 Refresh Data'):
         st.rerun()
 
     tickets = fetch_tickets()
     
     if not tickets:
-        st.warning("No active tickets found or API connection failed.")
+        st.info("No tickets currently match the criteria or the API returned an empty list.")
         return
 
-    # Process Data into DataFrame
     df = pd.DataFrame(tickets)
     
-    # --- 1. SAFE IDENTIFICATION OF CUSTOMER REPLIES ---
-    # We check if the column exists before filtering to avoid KeyError
+    # --- 1. FILTER CUSTOMER REPLIES ---
+    # RepairShopr uses 'has_unread_ticket_comments' for new replies
     if 'has_unread_ticket_comments' in df.columns:
         replied_tickets = df[df['has_unread_ticket_comments'] == True].copy()
     else:
         replied_tickets = pd.DataFrame()
 
-    # --- 2. SAFE IDENTIFICATION OF DUE/OVERDUE TICKETS ---
+    # --- 2. FILTER DUE/OVERDUE ---
     if 'due_date' in df.columns:
-        # errors='coerce' turns unparseable dates into NaT (Not a Time) instead of crashing
         df['due_date'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
-        
-        # Remove tickets that have no due date set
         df_dates = df.dropna(subset=['due_date'])
         
         now = datetime.now()
@@ -65,36 +65,30 @@ def main():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.header("📩 Unread Customer Replies")
+        st.subheader("📩 Unread Replies")
         if not replied_tickets.empty:
             for _, row in replied_tickets.iterrows():
-                # .get() provides a fallback if a specific field is missing in a row
-                t_num = row.get('number', 'N/A')
-                t_subj = row.get('subject', 'No Subject')
-                t_cust = row.get('customer_business_then_name', 'Unknown Customer')
-                st.info(f"**Ticket #{t_num}**: {t_subj}\n\n*Customer: {t_cust}*")
+                with st.expander(f"Ticket #{row.get('number')} - {row.get('subject')[:30]}...", expanded=True):
+                    st.write(f"**Customer:** {row.get('customer_business_then_name')}")
+                    st.write(f"**Status:** {row.get('status')}")
         else:
-            st.success("No unread replies!")
+            st.success("All customer messages have been read.")
 
     with col2:
-        st.header("⏰ Due Date Alerts")
+        st.subheader("⏰ Deadline Watch")
         
         if not overdue_tickets.empty:
-            st.subheader("🚨 Overdue")
+            st.error(f"**{len(overdue_tickets)} Tickets Overdue**")
             for _, row in overdue_tickets.iterrows():
-                t_num = row.get('number', 'N/A')
-                d_date = row['due_date'].strftime('%Y-%m-%d %H:%M')
-                st.error(f"**Ticket #{t_num}** - Due: {d_date}")
+                st.write(f"❌ **#{row.get('number')}** - Due: {row['due_date'].strftime('%d %b, %H:%M')}")
         
         if not near_due_tickets.empty:
-            st.subheader("⚠️ Due Soon (Next 24h)")
+            st.warning(f"**{len(near_due_tickets)} Tickets Due within 24h**")
             for _, row in near_due_tickets.iterrows():
-                t_num = row.get('number', 'N/A')
-                d_date = row['due_date'].strftime('%Y-%m-%d %H:%M')
-                st.warning(f"**Ticket #{t_num}** - Due: {d_date}")
+                st.write(f"⚠️ **#{row.get('number')}** - Due: {row['due_date'].strftime('%d %b, %H:%M')}")
         
         if overdue_tickets.empty and near_due_tickets.empty:
-            st.success("No tickets are overdue or due in the next 24 hours.")
+            st.success("No immediate deadlines pending.")
 
 if __name__ == "__main__":
     main()
