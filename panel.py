@@ -11,7 +11,7 @@ BASE_URL = f"https://{SUBDOMAIN}.repairshopr.com/api/v1"
 st.set_page_config(page_title="Illegear Real-Time Monitor", layout="wide", initial_sidebar_state="collapsed")
 
 # --- CSS & AUTO-REFRESH ---
-# We use a single markdown block to handle styles and the 30s refresh meta-tag
+# This block handles the layout and forces a browser refresh every 30 seconds
 st.markdown("""
     <meta http-equiv="refresh" content="30">
     <style>
@@ -70,13 +70,15 @@ def main():
     df = pd.DataFrame(raw_tickets)
     now = datetime.now()
     
-    # Safety checks for data columns
-    if 'has_unread_ticket_comments' not in df.columns: df['has_unread_ticket_comments'] = False
-    if 'due_date' not in df.columns: df['due_date'] = None
+    # Ensure necessary columns exist for the logic
+    if 'has_unread_ticket_comments' not in df.columns: 
+        df['has_unread_ticket_comments'] = False
+    if 'due_date' not in df.columns: 
+        df['due_date'] = None
     
     df['due_date_dt'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
 
-    # Building the HTML string
+    # Initialize the grid string
     grid_html = '<div class="ticket-grid">'
     
     for _, row in df.iterrows():
@@ -84,7 +86,7 @@ def main():
         due_dt = row['due_date_dt']
         is_overdue = pd.notnull(due_dt) and due_dt <= now
         
-        # Define the Visual Tags
+        # Tags for UI clarity
         reply_label = '<div class="reply-tag">📩 CUSTOMER REPLIED</div>' if is_unread else ""
         
         if pd.notnull(due_dt):
@@ -93,12 +95,14 @@ def main():
         else:
             due_label = '<div style="color:#444; font-size:0.8rem; margin-top:10px;">NO DUE DATE</div>'
         
-        # Indicator logic
+        # Determine the color of the top bar
         indicator_style = "status-normal"
-        if is_overdue: indicator_style = "status-overdue"
-        elif is_unread: indicator_style = "status-unread"
+        if is_overdue: 
+            indicator_style = "status-overdue"
+        elif is_unread: 
+            indicator_style = "status-unread"
 
-        # Construct individual box
+        # Append individual box HTML to the grid string
         grid_html += f"""
         <div class="ticket-box">
             <div class="indicator {indicator_style}"></div>
@@ -110,9 +114,10 @@ def main():
         </div>
         """
     
+    # Close the grid container
     grid_html += '</div>'
     
-    # FINAL RENDER: This must be the only call to display the grid
+    # Render the entire block as HTML in one call
     st.markdown(grid_html, unsafe_allow_html=True)
 
 if __name__ == "__main__":
