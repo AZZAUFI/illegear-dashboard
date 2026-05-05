@@ -10,12 +10,11 @@ BASE_URL = f"https://{SUBDOMAIN}.repairshopr.com/api/v1"
 
 st.set_page_config(page_title="Illegear Command Center", layout="wide", initial_sidebar_state="collapsed")
 
-# --- RESPONSIVE AUTO-GRID STYLING ---
-st.markdown("""
-    <style>
+# --- CSS STYLING ---
+# Ensure there are NO spaces between the triple quotes and the <style> tag
+st.markdown("""<style>
     .stApp { background-color: #05070a; color: #e0e0e0; }
     header {visibility: hidden;}
-    
     .main-header {
         font-family: 'Courier New', monospace;
         color: #00ffcc;
@@ -25,52 +24,33 @@ st.markdown("""
         padding: 10px;
         border: 1px solid #00ffcc;
         margin-bottom: 20px;
-        box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
     }
-
     .ticket-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         gap: 15px;
         padding: 10px;
     }
-
     .ticket-box {
         background: #11141b;
         border: 1px solid #2d3139;
         border-radius: 4px;
         padding: 15px;
         position: relative;
-        transition: all 0.3s ease;
     }
-    
-    .ticket-box:hover {
-        border-color: #00ffcc;
-        background: #161a24;
-        transform: translateY(-3px);
-    }
-
     .indicator {
-        height: 5px;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        border-radius: 4px 4px 0 0;
+        height: 5px; width: 100%; position: absolute;
+        top: 0; left: 0; border-radius: 4px 4px 0 0;
     }
-    .status-unread { background: #00d4ff; box-shadow: 0 0 12px #00d4ff; }
-    .status-overdue { background: #ff3e3e; box-shadow: 0 0 12px #ff3e3e; }
-    .status-warning { background: #ffaa00; box-shadow: 0 0 12px #ffaa00; }
+    .status-unread { background: #00d4ff; }
+    .status-overdue { background: #ff3e3e; }
+    .status-warning { background: #ffaa00; }
     .status-normal { background: #444; }
-
-    .ticket-no { font-size: 0.75rem; color: #888; font-family: monospace; }
-    .cust-name { font-size: 1.1rem; font-weight: bold; color: #fff; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ticket-subject { font-size: 0.85rem; color: #bbb; margin: 8px 0; min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .ticket-time { font-size: 0.8rem; font-weight: bold; line-height: 1.2; }
-    
-    div[data-testid="stMetricValue"] { color: #00ffcc !important; font-family: monospace; }
-    </style>
-    """, unsafe_allow_html=True)
+    .ticket-no { font-size: 0.75rem; color: #888; }
+    .cust-name { font-size: 1.1rem; font-weight: bold; color: #fff; }
+    .ticket-subject { font-size: 0.85rem; color: #bbb; margin: 8px 0; }
+    div[data-testid="stMetricValue"] { color: #00ffcc !important; }
+</style>""", unsafe_allow_html=True)
 
 def fetch_tickets():
     headers = {'Authorization': f'Bearer {API_KEY}'}
@@ -81,82 +61,45 @@ def fetch_tickets():
 
 def main():
     st.markdown('<div class="main-header">ILLEGEAR LIVE TICKET MONITOR</div>', unsafe_allow_html=True)
-    
     tickets = fetch_tickets()
     
     if not tickets:
-        st.info("🛰️ Scanning for active signals... No tickets detected.")
-        if st.button('RE-SCAN SYSTEM'): st.rerun()
+        st.info("🛰️ Scanning for active signals...")
         return
 
     df = pd.DataFrame(tickets)
-    
-    # Data Safety Fixes
-    if 'has_unread_ticket_comments' not in df.columns:
-        df['has_unread_ticket_comments'] = False
-    if 'due_date' not in df.columns:
-        df['due_date'] = None
+    if 'has_unread_ticket_comments' not in df.columns: df['has_unread_ticket_comments'] = False
+    if 'due_date' not in df.columns: df['due_date'] = None
 
     now = datetime.now()
     df['due_date_dt'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
 
-    # Metrics
-    unread_count = len(df[df['has_unread_ticket_comments'] == True])
-    overdue_count = len(df[df['due_date_dt'] <= now].dropna(subset=['due_date_dt']))
-    
     m1, m2, m3 = st.columns(3)
     m1.metric("TOTAL SYSTEMS", len(df))
-    m2.metric("UNREAD REPLIES", unread_count)
-    m3.metric("CRITICAL OVERDUE", overdue_count)
+    m2.metric("UNREAD", len(df[df['has_unread_ticket_comments'] == True]))
+    m3.metric("OVERDUE", len(df[df['due_date_dt'] <= now].dropna(subset=['due_date_dt'])))
 
-    # BUILDING THE GRID CONTENT
-    grid_items_html = ""
-    
+    # --- GRID RENDERING ---
+    grid_items = ""
     for _, row in df.iterrows():
-        status_class = "status-normal"
-        status_text = "STABLE"
-        time_display = ""
-        
         is_unread = row['has_unread_ticket_comments']
         is_overdue = pd.notnull(row['due_date_dt']) and row['due_date_dt'] <= now
-        is_near = pd.notnull(row['due_date_dt']) and (now < row['due_date_dt'] <= now + pd.Timedelta(hours=24))
-
-        color = "#888"
-        if is_overdue:
-            status_class = "status-overdue"
-            status_text = "CRITICAL: OVERDUE"
-            time_display = row['due_date_dt'].strftime('%d %b %H:%M')
-            color = "#ff3e3e"
-        elif is_unread:
-            status_class = "status-unread"
-            status_text = "NEW MESSAGE"
-            time_display = "Action Required"
-            color = "#00d4ff"
-        elif is_near:
-            status_class = "status-warning"
-            status_text = "URGENT: DUE SOON"
-            time_display = row['due_date_dt'].strftime('%H:%M Today')
-            color = "#ffaa00"
         
-        # Accumulate the HTML for each box
-        grid_items_html += f"""
+        status = "status-normal"
+        if is_overdue: status = "status-overdue"
+        elif is_unread: status = "status-unread"
+
+        # Build individual ticket HTML
+        grid_items += f"""
         <div class="ticket-box">
-            <div class="indicator {status_class}"></div>
+            <div class="indicator {status}"></div>
             <div class="ticket-no">REF: #{row.get('number', '???')}</div>
             <div class="cust-name">{row.get('customer_business_then_name', 'UNKNOWN')}</div>
             <div class="ticket-subject">{str(row.get('subject', 'No Subject'))[:60]}</div>
-            <div class="ticket-time" style="color: {color}">
-                {status_text} <br> {time_display}
-            </div>
-        </div>
-        """
+        </div>"""
     
-    # RENDER THE WHOLE GRID AT ONCE
-    st.markdown(f'<div class="ticket-grid">{grid_items_html}</div>', unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button('REFRESH SYSTEM SCAN'):
-        st.rerun()
+    # Render the final container
+    st.markdown(f'<div class="ticket-grid">{grid_items}</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
