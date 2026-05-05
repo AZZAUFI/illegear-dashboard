@@ -8,58 +8,71 @@ API_KEY = "T6d9c84acd6b1bf2d4-138a57ae68df0b79ab964e01ad2147ba"
 SUBDOMAIN = "illegearticket" 
 BASE_URL = f"https://{SUBDOMAIN}.repairshopr.com/api/v1"
 
-# Force wide mode and hide sidebar for maximum screen real estate
 st.set_page_config(page_title="Illegear Command Center", layout="wide", initial_sidebar_state="collapsed")
 
-# --- GRID & HOSPITAL UI STYLING ---
+# --- RESPONSIVE AUTO-GRID STYLING ---
 st.markdown("""
     <style>
-    /* Global Styles */
     .stApp { background-color: #05070a; color: #e0e0e0; }
     header {visibility: hidden;}
+    
+    /* Title Bar */
     .main-header {
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Courier New', monospace;
         color: #00ffcc;
         text-align: center;
-        font-size: 1.8rem;
-        font-weight: 800;
-        letter-spacing: 3px;
-        margin-bottom: 5px;
+        font-size: 1.5rem;
+        font-weight: bold;
         padding: 10px;
-        background: rgba(0, 255, 204, 0.05);
-        border-bottom: 1px solid #00ffcc;
+        border: 1px solid #00ffcc;
+        margin-bottom: 20px;
+        box-shadow: 0 0 10px rgba(0, 255, 204, 0.2);
     }
 
-    /* Fixed Height Scrollable Containers */
-    .grid-container {
-        height: 75vh;
-        overflow-y: auto;
-        padding-right: 10px;
+    /* THE MAGIC: Auto-detecting Responsive Grid */
+    .ticket-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 15px;
+        padding: 10px;
+    }
+
+    /* Individual Ticket Box */
+    .ticket-box {
+        background: #11141b;
+        border: 1px solid #2d3139;
+        border-radius: 4px;
+        padding: 15px;
+        position: relative;
+        transition: transform 0.2s;
     }
     
-    /* Scrollbar Styling */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: #0e1117; }
-    ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-
-    /* Panel Card Styling */
-    .panel-card {
-        background: #11141a;
-        border-radius: 4px;
-        padding: 12px;
-        margin-bottom: 8px;
-        border-left: 4px solid #444;
+    .ticket-box:hover {
+        border-color: #00ffcc;
+        transform: translateY(-2px);
     }
-    .unread-border { border-left-color: #00d4ff; box-shadow: inset 5px 0 10px -5px #00d4ff; }
-    .overdue-border { border-left-color: #ff3e3e; box-shadow: inset 5px 0 10px -5px #ff3e3e; }
-    .neardue-border { border-left-color: #ffaa00; box-shadow: inset 5px 0 10px -5px #ffaa00; }
 
-    .card-id { font-size: 0.7rem; color: #888; font-weight: bold; }
-    .card-title { font-size: 1rem; font-weight: 700; color: #fff; margin: 2px 0; }
-    .card-meta { font-size: 0.8rem; color: #bbb; }
+    /* Status Indicators */
+    .indicator {
+        height: 4px;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        border-radius: 4px 4px 0 0;
+    }
+    .status-unread { background: #00d4ff; box-shadow: 0 0 10px #00d4ff; }
+    .status-overdue { background: #ff3e3e; box-shadow: 0 0 10px #ff3e3e; }
+    .status-warning { background: #ffaa00; box-shadow: 0 0 10px #ffaa00; }
+    .status-normal { background: #444; }
+
+    .ticket-no { font-size: 0.75rem; color: #888; font-family: monospace; }
+    .cust-name { font-size: 1.1rem; font-weight: bold; color: #fff; margin-top: 5px; }
+    .ticket-subject { font-size: 0.85rem; color: #bbb; margin: 8px 0; min-height: 40px; }
+    .ticket-time { font-size: 0.8rem; font-weight: bold; }
     
     /* Metric styling */
-    div[data-testid="stMetricValue"] { font-size: 2rem !important; color: #00ffcc !important; }
+    div[data-testid="stMetricValue"] { color: #00ffcc !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -68,86 +81,76 @@ def fetch_tickets():
     try:
         response = requests.get(f"{BASE_URL}/tickets", headers=headers, timeout=10)
         return response.json().get('tickets', []) if response.status_code == 200 else []
-    except:
-        return []
+    except: return []
 
 def main():
-    st.markdown('<div class="main-header">ILLEGEAR COMMAND CENTER : MONITOR 01</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">ILLEGEAR LIVE TICKET MONITOR</div>', unsafe_allow_html=True)
     
-    # Auto-refresh helper (simulated by a small button)
-    cols = st.columns([6, 1])
-    with cols[1]:
-        if st.button('REFRESH'): st.rerun()
-
+    # Top Stats
     tickets = fetch_tickets()
     df = pd.DataFrame(tickets)
+    
+    if df.empty:
+        st.info("Searching for active signals...")
+        return
 
-    unread = overdue = near_due = pd.DataFrame()
+    # Process Times
+    now = datetime.now()
+    df['due_date_dt'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
 
-    if not df.empty:
-        if 'has_unread_ticket_comments' in df.columns:
-            unread = df[df['has_unread_ticket_comments'] == True]
-        if 'due_date' in df.columns:
-            df['due_date'] = pd.to_datetime(df['due_date'], errors='coerce').dt.tz_localize(None)
-            now = datetime.now()
-            overdue = df[df['due_date'] <= now].dropna(subset=['due_date'])
-            near_due = df[(df['due_date'] > now) & (df['due_date'] <= now + pd.Timedelta(hours=24))]
+    # Metrics
+    unread_count = len(df[df.get('has_unread_ticket_comments', False) == True])
+    overdue_count = len(df[df['due_date_dt'] <= now].dropna(subset=['due_date_dt']))
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("ACTIVE SYSTEMS", len(df))
+    m2.metric("UNREAD REPLIES", unread_count)
+    m3.metric("CRITICAL OVERDUE", overdue_count)
 
-    # --- TOP ANALYTICS BAR ---
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("TOTAL QUEUE", len(df))
-    m2.metric("UNREAD REPLIES", len(unread))
-    m3.metric("CRITICAL OVERDUE", len(overdue))
-    m4.metric("DUE 24H", len(near_due))
+    # Building the Grid
+    grid_html = '<div class="ticket-grid">'
+    
+    for _, row in df.iterrows():
+        # Determine Status
+        status_class = "status-normal"
+        status_text = "STABLE"
+        time_display = ""
+        
+        is_unread = row.get('has_unread_ticket_comments', False)
+        is_overdue = pd.notnull(row['due_date_dt']) and row['due_date_dt'] <= now
+        is_near = pd.notnull(row['due_date_dt']) and (now < row['due_date_dt'] <= now + pd.Timedelta(hours=24))
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        if is_overdue:
+            status_class = "status-overdue"
+            status_text = "CRITICAL: OVERDUE"
+            time_display = row['due_date_dt'].strftime('%d %b %H:%M')
+        elif is_unread:
+            status_class = "status-unread"
+            status_text = "NEW MESSAGE"
+            time_display = "Action Required"
+        elif is_near:
+            status_class = "status-warning"
+            status_text = "URGENT: DUE SOON"
+            time_display = row['due_date_dt'].strftime('%H:%M Today')
+        
+        grid_html += f"""
+        <div class="ticket-box">
+            <div class="indicator {status_class}"></div>
+            <div class="ticket-no">REF: #{row.get('number')}</div>
+            <div class="cust-name">{row.get('customer_business_then_name', 'UNKNOWN')}</div>
+            <div class="ticket-subject">{row.get('subject', 'No Subject')[:60]}</div>
+            <div class="ticket-time" style="color: {'#ff3e3e' if is_overdue else '#00d4ff' if is_unread else '#ffaa00' if is_near else '#888'}">
+                {status_text} <br> {time_display}
+            </div>
+        </div>
+        """
+    
+    grid_html += '</div>'
+    st.markdown(grid_html, unsafe_allow_html=True)
 
-    # --- TRIPLE GRID LAYOUT ---
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("### 📩 REPLIES")
-        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
-        if not unread.empty:
-            for _, row in unread.iterrows():
-                st.markdown(f"""<div class="panel-card unread-border">
-                    <div class="card-id">TICKET #{row.get('number')}</div>
-                    <div class="card-title">{row.get('customer_business_then_name', 'N/A')}</div>
-                    <div class="card-meta">{row.get('subject', '')[:40]}...</div>
-                </div>""", unsafe_allow_html=True)
-        else:
-            st.info("No unread replies.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("### 🚨 OVERDUE")
-        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
-        if not overdue.empty:
-            for _, row in overdue.iterrows():
-                st.markdown(f"""<div class="panel-card overdue-border">
-                    <div class="card-id">TICKET #{row.get('number')}</div>
-                    <div class="card-title">🚨 OVERDUE</div>
-                    <div class="card-meta">Expired: {row['due_date'].strftime('%d %b %H:%M')}</div>
-                    <div class="card-meta">{row.get('customer_business_then_name', '')[:25]}</div>
-                </div>""", unsafe_allow_html=True)
-        else:
-            st.success("No overdue tickets.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col3:
-        st.markdown("### ⏳ DUE SOON")
-        st.markdown('<div class="grid-container">', unsafe_allow_html=True)
-        if not near_due.empty:
-            for _, row in near_due.iterrows():
-                st.markdown(f"""<div class="panel-card neardue-border">
-                    <div class="card-id">TICKET #{row.get('number')}</div>
-                    <div class="card-title">WARNING</div>
-                    <div class="card-meta">Due: {row['due_date'].strftime('%H:%M Today')}</div>
-                    <div class="card-meta">{row.get('subject', '')[:35]}</div>
-                </div>""", unsafe_allow_html=True)
-        else:
-            st.info("No upcoming deadlines.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Invisible auto-refresh (reloads every time user interacts or clicks)
+    if st.button('REFRESH SCAN'):
+        st.rerun()
 
 if __name__ == "__main__":
     main()
